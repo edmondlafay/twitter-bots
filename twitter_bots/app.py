@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 import logging
 import threading
-from .bots import proper_deals
+from .bots import proper_deals, contest_bot
 
 def run():
   format = "%(asctime)s: %(message)s"
   logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
 
   bot_list = [
-    proper_deals.ProperDeals()
+    proper_deals.ProperDeals(),
+    #contest_bot.ContestBot()
   ]
 
   # Launch bots

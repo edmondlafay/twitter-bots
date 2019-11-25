@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-import tweepy, time, logging, json
+import tweepy, time, logging
 from ..common.config import config
 
 class Bot:
   name = 'bot'
-  timeout_minutes=60
+  timeout_minutes=15
   thread = None
 
   def twitter_auth(self):
@@ -20,7 +20,7 @@ class Bot:
       self.api.verify_credentials()
       logging.debug(f"{self.name}: Authentication OK")
     except:
-      logging.error(f"{self.name} : Error during authentication")
+      raise Exception(f"{self.name} : Error during authentication")
 
   def twitbot_timeout(self, log_level, message):
     """Timeout the bot and log the reason"""
