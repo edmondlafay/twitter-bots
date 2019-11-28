@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import twitter, time, logging, json
+import twitter, time, logging, json, requests
 from ..common.config import config
 
 class Bot:
@@ -28,7 +28,7 @@ class Bot:
     getattr(logging, log_level)(f"{self.name} : {message}, sleeping {self.timeout_minutes} mins")
     time.sleep(self.timeout_minutes * 60)
 
-  def errorResilientCall(self, function, params, retry=3):
+  def errorResilientCall(self, function, params, retries=3):
     """Handle common twitter/requests errors"""
     try:
       return function(**params)
