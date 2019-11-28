@@ -12,10 +12,11 @@ class ProperDeals(Bot):
     self.shopping_author='seigneurcanard'
     super().__init__()
 
-  def get_last_post_tweet_ids(self, count):
+  def get_last_post_tweet_ids(self, count, retries=3):
     """Get last tweets ids we used to post"""
     result = set()
-    for tweet in self.api.GetHomeTimeline(count=count):
+    homeTimeline = self.errorResilientCall(function=self.api.GetHomeTimeline, params={'count':count})
+    for tweet in homeTimeline:
       if tweet.quoted_status_id:
         result.add(tweet.quoted_status_id)
       elif tweet.retweeted_status:
@@ -112,14 +113,14 @@ class ProperDeals(Bot):
             return self.post_tweet(**(result))
     return self.post_retweet(tweet)
 
-  def run(self):
-    logging.info(f"{self.name} : starting OK")
-    while True:
-      past_tweet_ids = self.get_last_post_tweet_ids(count=200)
-      for tweet in self.api.GetListTimeline(count=60, owner_screen_name=self.shopping_author, slug=self.shopping_list):
-        # if the url has a link and not handled yed
-        if len(tweet.urls)>0 and tweet.id not in past_tweet_ids:
-          logging.info('***********************************************')
-          logging.info(f"{self.name} - run : https://twitter.com/{tweet.user.screen_name}/status/{tweet.id}")
-          self.build_status(tweet)
-      self.twitbot_timeout('info', 'up to date')
+  def run(self, retries=3):
+    past_tweet_ids = self.get_last_post_tweet_ids(count=200)
+    listTimeline = self.errorResilientCall(function=self.api.GetListTimeline, params={'count':60, 'owner_screen_name': self.shopping_author, 'slug': self.shopping_list})
+    for tweet in listTimeline:
+      # if the url has a link and not handled yet
+      if len(tweet.urls)>0 and tweet.id not in past_tweet_ids:
+        logging.info('***********************************************')
+        logging.info(f"{self.name} - run : https://twitter.com/{tweet.user.screen_name}/status/{tweet.id}")
+        self.build_status(tweet)
+    self.twitbot_timeout('info', 'up to date')
+    self.run()
