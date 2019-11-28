@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import tweepy, time, logging
+import twitter, time, logging, json
 from ..common.config import config
 
 class Bot:
@@ -10,15 +10,16 @@ class Bot:
   def twitter_auth(self):
     """Authenticate to Twitter"""
     twitter_conf = config.get('twitter', {}).get(self.name, {})
-    auth = tweepy.OAuthHandler(twitter_conf.get('api_key'), twitter_conf.get('api_secret'))
-    auth.set_access_token(twitter_conf.get('access_token'), twitter_conf.get('access_secret'))
-    return auth
+    return twitter.Api(consumer_key=twitter_conf.get('api_key'),
+      consumer_secret=twitter_conf.get('api_secret'),
+      access_token_key=twitter_conf.get('access_token'),
+      access_token_secret=twitter_conf.get('access_secret'),
+      tweet_mode='extended')
 
   def __init__(self):
-    self.api = tweepy.API(self.twitter_auth(), wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
+    self.api = self.twitter_auth()
     try:
-      self.api.verify_credentials()
-      logging.debug(f"{self.name}: Authentication OK")
+      logging.info(f"{self.name} : {self.api.VerifyCredentials()}")
     except:
       raise Exception(f"{self.name} : Error during authentication")
 
@@ -27,45 +28,46 @@ class Bot:
     getattr(logging, log_level)(f"{self.name} : {message}, sleeping {self.timeout_minutes} mins")
     time.sleep(self.timeout_minutes * 60)
 
-  def limit_handled(self, cursor):
-    """Cursor handling"""
-    tweets_left = True
-    while tweets_left:
-      try:
-        yield cursor.next()
-      except tweepy.RateLimitError:
-        self.twitbot_timeout('warn', 'rate limit cursor exceeded')
-      except StopIteration:
-        self.twitbot_timeout('info', 'Up to date')
-        tweets_left = False
-  
   def post_tweet(self, retries=3, **kwargs):
     """Post tweet handling"""
     try:
-      logging.info(f"{self.name} : tweeting {kwargs}")
-      self.api.update_status(**kwargs)
-    except tweepy.TweepError as tweep_error:
-      logging.warn(f"{self.name} - post_tweet : {tweep_error}")
-    except tweepy.RateLimitError:
-      if retries>0:
+      accepter_params = set(self.api.PostUpdate.__code__.co_varnames)
+      accepter_params.discard('self')
+      accepter_params.discard('status')
+      args = {}
+      for valid_key in accepter_params:
+        if kwargs.get(valid_key):
+          args[valid_key] = kwargs.get(valid_key)
+      logging.info(f"{self.name} : tweeting {args}")
+      self.api.PostUpdate(status=kwargs['status'], **args)
+    except twitter.error.TwitterError as tweep_error:
+      if tweep_error.message[0]['message'] == 'Rate limit exceeded' and retries > 0:
         self.twitbot_timeout('warn', 'post_tweet rate limit exceeded')
-        self.post_tweet(status, retries=retries-1)
+        self.post_tweet(retries=retries-1, **kwargs)
       else:
-        raise Exception(f"{self.name} - post_tweet : Max retries exceeded for post_tweet")
+        logging.warn(f"{self.name} - post_tweet : tweet_id {tweet.id} - {tweep_error}")
+        raise Exception(f"{self.name} - post_tweet")
+    except requests.exceptions.ConnectionError:
+      self.twitbot_timeout('warn', 'post_tweet connection error')
+      self.post_tweet(retries=retries-1, **kwargs)
   
   def post_retweet(self, tweet, retries=3):
     """Post retweet handling"""
     try:
-      self.api.retweet(tweet.id)
+      self.api.PostRetweet(tweet.id)
       logging.info(f"{self.name} - post_retweet : https://twitter.com/{tweet.user.screen_name}/status/{tweet.id}")
-    except tweepy.TweepError as tweep_error:
-      logging.warn(f"{self.name} - post_retweet : tweet_id {tweet.id} - {tweep_error}")
-    except tweepy.RateLimitError:
-      if retries>0:
+    except twitter.error.TwitterError as tweep_error:
+      if tweep_error.message[0]['message'] == 'You have already retweeted this Tweet.':
+        logging.info('already retweeted this Tweet')
+      elif tweep_error.message[0]['message'] == 'Rate limit exceeded' and retries > 0:
         self.twitbot_timeout('warn', 'post_retweet rate limit exceeded')
-        self.post_retweet(status, retries=retries-1)
+        self.post_retweet(tweet, retries=retries-1)
       else:
-        raise Exception(f"{self.name} - post_retweet : Max retries exceeded for post_tweet")
+        logging.warn(f"{self.name} - post_retweet : tweet_id {tweet.id} - {tweep_error}")
+        raise Exception(f"{self.name} - post_retweet")
+    except requests.exceptions.ConnectionError:
+      self.twitbot_timeout('warn', 'post_retweet connection error')
+      self.post_retweet(tweet, retries=retries-1)
 
   def run(self):
     """Run the bot"""
