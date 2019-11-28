@@ -115,7 +115,7 @@ class ProperDeals(Bot):
 
   def run(self, retries=3):
     past_tweet_ids = self.get_last_post_tweet_ids(count=200)
-    listTimeline = self.errorResilientCall(function=self.api.GetListTimeline, params={'count':60, 'owner_screen_name': self.shopping_author, 'slug': self.shopping_list})
+    listTimeline = self.errorResilientCall(function=self.api.GetListTimeline, params={'count':30, 'owner_screen_name': self.shopping_author, 'slug': self.shopping_list})
     for tweet in listTimeline:
       # if the url has a link and not handled yet
       if len(tweet.urls)>0 and tweet.id not in past_tweet_ids:
