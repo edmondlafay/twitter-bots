@@ -6,11 +6,11 @@ from .bot import Bot
 
 
 class ProperDeals(Bot):
-  def __init__(self):
+  def __init__(self, debug=False):
     self.name = 'proper_deals'
     self.shopping_list='shopping'
     self.shopping_author='seigneurcanard'
-    super().__init__()
+    super().__init__(debug=debug)
 
   def get_last_post_tweet_ids(self, count, retries=3):
     """Get last tweets ids we used to post"""
@@ -26,24 +26,24 @@ class ProperDeals(Bot):
     return result
 
   def external_request(self, url, stream=False):
-    logging.info(f"{self.name} - external_request : url {url}")
+    logging.debug(f"{self.name} - external_request : url {url}")
     domain = urlparse(url).netloc
     headers = {
-        'User-Agent': "PostmanRuntime/7.20.1", 'Accept': "*/*",
-        'Accept-Encoding': "gzip, deflate", 'Connection': "keep-alive"
-      }
+      'User-Agent': "PostmanRuntime/7.20.1", 'Accept': "*/*",
+      'Accept-Encoding': "gzip, deflate", 'Connection': "keep-alive"
+    }
     if domain in {'www.bons-plans-bonnes-affaires.fr'}:
       headers['Host'] = domain
       response = requests.get(url, headers=headers, stream=stream)
     elif domain in {'amzn.to'}:
       headers['Referer'] = url
       session = requests.session()
-      response = session.get("https://www.amazon.com/",headers=headers, stream=stream)
+      response = session.get(url, headers=headers, stream=stream)
     else:
       response = requests.get(url, headers=headers, stream=stream)
     
     if response.status_code != 200:
-      logging.info(f"{self.name} - build_status : url responded {response.status_code}")
+      logging.warn(f"{self.name} - build_status : url responded {response.status_code}")
     return response
 
   def build_status(self, tweet):
@@ -102,7 +102,7 @@ class ProperDeals(Bot):
               image.write(chunk)
           file_type = imghdr.what(filename)
           if not file_type:
-            logging.info(f"{self.name} - build_status : no picture format {result['img']}")
+            logging.debug(f"{self.name} - build_status : no picture format {result['img']}")
           else:
             os.rename(filename, filename + '.' + file_type)
             result['media']=[filename + '.' + file_type]
@@ -110,7 +110,9 @@ class ProperDeals(Bot):
             black_friday_tag = re.search(r"#blackfriday", tweet.full_text, flags=re.IGNORECASE)
             if black_friday_tag:
               result['status'] = result['status'] + ' #blackfriday'
+            logging.debug(f"{self.name} - build_status : build result {result}")
             return self.post_tweet(**(result))
+    logging.debug(f"{self.name} - build_status : build result {result}")
     return self.post_retweet(tweet)
 
   def run(self, retries=3):
@@ -119,7 +121,6 @@ class ProperDeals(Bot):
     for tweet in listTimeline:
       # if the url has a link and not handled yet
       if len(tweet.urls)>0 and tweet.id not in past_tweet_ids:
-        logging.info('***********************************************')
         logging.info(f"{self.name} - run : https://twitter.com/{tweet.user.screen_name}/status/{tweet.id}")
         self.build_status(tweet)
     self.twitbot_timeout('info', 'up to date')

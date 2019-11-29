@@ -2,6 +2,8 @@
 import twitter, time, logging, json, requests
 from ..common.config import config
 
+newline_char = "\n"
+
 class Bot:
   name = 'bot'
   timeout_minutes=15
@@ -16,10 +18,12 @@ class Bot:
       access_token_secret=twitter_conf.get('access_secret'),
       tweet_mode='extended')
 
-  def __init__(self):
+  def __init__(self, debug=False):
     self.api = self.twitter_auth()
+    self.debug = debug
+    self.timeout_minutes = 1 if debug else 15
     try:
-      logging.info(f"{self.name} : {self.api.VerifyCredentials()}")
+      logging.debug(f"{self.name} : {self.api.VerifyCredentials()}")
     except:
       raise Exception(f"{self.name} : Error during authentication")
 
@@ -57,13 +61,15 @@ class Bot:
     for valid_key in accepter_params:
       if kwargs.get(valid_key):
         args[valid_key] = kwargs.get(valid_key)
-    logging.info(f"{self.name} : tweeting {args}")
-    return self.errorResilientCall(function=self.api.PostUpdate, params={'status': kwargs['status'], **args})
+    logging.debug(f"{self.name} - post_tweet :  {kwargs['status']}")
+    if not self.debug:
+      return self.errorResilientCall(function=self.api.PostUpdate, params={'status': kwargs['status'], **args})
 
   def post_retweet(self, tweet, retries=3):
     """Post retweet handling"""
-    logging.info(f"{self.name} - post_retweet : https://twitter.com/{tweet.user.screen_name}/status/{tweet.id}")
-    return self.errorResilientCall(function=self.api.PostRetweet, params={'status_id':tweet.id})
+    logging.debug(f"{self.name} - post_retweet : {tweet.full_text.replace(newline_char, '')}")
+    if not self.debug:
+      return self.errorResilientCall(function=self.api.PostRetweet, params={'status_id':tweet.id})
 
   def run(self):
     """Run the bot"""
