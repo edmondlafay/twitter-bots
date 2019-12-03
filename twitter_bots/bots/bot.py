@@ -45,14 +45,14 @@ class Bot:
       else:
         logging.warn(f"{self.name} - {function.__name__} : {tweep_error}")
         raise Exception(f"{self.name} - {function.__name__}")
-    except requests.exceptions.ConnectionError:
+    except (requests.exceptions.ConnectionError, requests.exceptions.TooManyRedirects):
       if retries > 0:
         self.twitbot_timeout('warn', f"{function.__name__} connection error")
         return self.errorResilientCall(function, params, retries=retries-1)
       else:
         raise Exception(f"{self.name} - {function.__name__}")
 
-  def post_tweet(self, retries=3, **kwargs):
+  def post_tweet(self, **kwargs):
     """Post tweet handling"""
     accepter_params = set(self.api.PostUpdate.__code__.co_varnames)
     accepter_params.discard('self')
@@ -65,7 +65,7 @@ class Bot:
     if not self.debug:
       return self.errorResilientCall(function=self.api.PostUpdate, params={'status': kwargs['status'], **args})
 
-  def post_retweet(self, tweet, retries=3):
+  def post_retweet(self, tweet):
     """Post retweet handling"""
     logging.debug(f"{self.name} - post_retweet : {tweet.full_text.replace(newline_char, '')}")
     if not self.debug:
